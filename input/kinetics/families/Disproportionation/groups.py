@@ -14,9 +14,9 @@ template(reactants=["Y_rad_birad_trirad_quadrad", "XH_Rrad_birad"], products=["Y
 reverse = "Molecular_Addition"
 
 recipe(actions=[
-    ['FORM_BOND', '*1', 'S', '*4'],
-    ['BREAK_BOND', '*2', 'S', '*4'],
-    ['CHANGE_BOND', '*2', '1', '*3'],
+    ['FORM_BOND', '*1', 1, '*4'],
+    ['BREAK_BOND', '*2', 1, '*4'],
+    ['CHANGE_BOND', '*2', 1, '*3'],
     ['LOSE_RADICAL', '*1', '1'],
     ['LOSE_RADICAL', '*3', '1'],
 ])
@@ -24,7 +24,7 @@ recipe(actions=[
 entry(
     index = 1,
     label = "Y_rad_birad_trirad_quadrad",
-    group = "OR{Y_1centerquadrad, Y_1centertrirad, Y_2centerbirad, Y_1centerbirad, Y_rad, H_rad}",
+    group = "OR{Y_1centerquadrad, Y_1centertrirad, Y_2centerbirad, Y_1centerbirad, Y_rad}",
     kinetics = None,
 )
 
@@ -2727,6 +2727,7 @@ L1: Y_rad_birad_trirad_quadrad
         L3: CH2_triplet
         L3: NH_triplet
     L2: Y_rad
+        L3: H_rad
         L3: Ct_rad
             L4: Ct_rad/Ct
             L4: Ct_rad/Nt
@@ -2810,7 +2811,6 @@ L1: Y_rad_birad_trirad_quadrad
                 L5: N3d_rad/N
         L3: N5_rad
             L4: N5d_rad
-        L3: H_rad
 L1: XH_Rrad_birad
     L2: XH_Rrad
         L3: XH_s_Rrad
@@ -2957,19 +2957,6 @@ u"""
 )
 
 forbidden(
-    label = "OS_birad_singlet",
-    group = 
-"""
-1 *1 [O,S] u0 p3
-""",
-    shortDesc = u"""""",
-    longDesc = 
-u"""
-
-""",
-)
-
-forbidden(
     label = "O_Orad",
     group = 
 """
@@ -2988,7 +2975,7 @@ forbidden(
     label = "XH_birad_singlet",
     group = 
 """
-1 *3 [C,N,Si] u0 p1 {2,[S,D,T]}
+1 *3 [C,Si] u0 p1 {2,[S,D,T]}
 2 *2 R!H      ux {1,[S,D,T]} {3,S}
 3 *4 H        u0 {2,S}
 """,
@@ -3003,7 +2990,7 @@ forbidden(
     label = "XH_quadrad_singlet",
     group = 
 """
-1 *3 [C,N,Si] u0 p2 {2,[S,D,T]}
+1 *3 [C,Si] u0 p2 {2,[S,D,T]}
 2 *2 R!H      ux {1,[S,D,T]} {3,S}
 3 *4 H        u0 {2,S}
 """,
@@ -3015,23 +3002,12 @@ u"""
 )
 
 forbidden(
-    label = "birad_singlet",
+    label = "XH_N_birad_singlet",
     group = 
 """
-1 *1 [C,N,Si] u0 p1
-""",
-    shortDesc = u"""""",
-    longDesc = 
-u"""
-
-""",
-)
-
-forbidden(
-    label = "quadrad_singlet",
-    group = 
-"""
-1 *1 [C,N,Si] u0 p2
+1 *3 N u0 p2 {2,[S,D]}
+2 *2 R!H      ux {1,[S,D]} {3,S}
+3 *4 H        u0 {2,S}
 """,
     shortDesc = u"""""",
     longDesc = 

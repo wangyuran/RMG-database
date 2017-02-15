@@ -12,8 +12,8 @@ template(reactants=["Rn"], products=["RnCyclic"], ownReverse=False)
 reverse = "Ring_Open_Endo_Cycli_Radical"
 
 recipe(actions=[
-    ['CHANGE_BOND', '*2', '-1', '*3'],
-    ['FORM_BOND', '*1', 'S', '*3'],
+    ['CHANGE_BOND', '*2', -1, '*3'],
+    ['FORM_BOND', '*1', 1, '*3'],
     ['GAIN_RADICAL', '*2', '1'],
     ['LOSE_RADICAL', '*1', '1'],
 ])
@@ -2627,32 +2627,6 @@ L1: radadd_intra
 )
 
 forbidden(
-    label = "OS_birad_singlet",
-    group = 
-"""
-1 *1 [O,S] u0 p3
-""",
-    shortDesc = u"""""",
-    longDesc = 
-u"""
-
-""",
-)
-
-forbidden(
-    label = "birad_singlet",
-    group = 
-"""
-1 *1 [C,N,Si] u0 p1
-""",
-    shortDesc = u"""""",
-    longDesc = 
-u"""
-
-""",
-)
-
-forbidden(
     label = "bond31",
     group = 
 """
@@ -2672,19 +2646,6 @@ forbidden(
 """
 1 *3 R!H u1 {2,[S,D]}
 2 *1 R!H u1 {1,[S,D]}
-""",
-    shortDesc = u"""""",
-    longDesc = 
-u"""
-
-""",
-)
-
-forbidden(
-    label = "quadrad_singlet",
-    group = 
-"""
-1 *1 [C,N,Si] u0 p2
 """,
     shortDesc = u"""""",
     longDesc = 

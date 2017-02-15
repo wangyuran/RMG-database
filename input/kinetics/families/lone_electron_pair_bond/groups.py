@@ -12,7 +12,7 @@ template(reactants=["N3sRRR", "O_atom_singlet"], products=["N3sRRRO"], ownRevers
 reverse = "Bond_Dissociation"
 
 recipe(actions=[
-    ['FORM_BOND', '*1', 'S', '*2'],
+    ['FORM_BOND', '*1', 1, '*2'],
     ['LOSE_PAIR', '*1', '1'],
 ])
 
@@ -45,18 +45,3 @@ L1: N3sRRR
 L1: O_atom_singlet
 """
 )
-
-forbidden(
-    label = "OJJH",
-    group = 
-"""
-1 O u2 {2,S}
-2 R u0 {1,S}
-""",
-    shortDesc = u"""""",
-    longDesc = 
-u"""
-
-""",
-)
-

@@ -264,6 +264,7 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
         """
         family = self.database.kinetics.families[family_name]
         for nodeName, nodeGroup in family.groups.entries.iteritems():
+            nose.tools.assert_false('[' in nodeName or ']' in nodeName, "Group {group} in {family} family contains square brackets [ ] in the label, which are not allowed.".format(group=nodeName, family=family_name))
             ascendParent = nodeGroup
             # Check whether the node has proper parents unless it is the top reactant or product node
             while ascendParent not in family.groups.top and ascendParent not in family.forwardTemplate.products:
@@ -271,6 +272,7 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
                 ascendParent = ascendParent.parent
                 nose.tools.assert_true(ascendParent is not None, "Group {group} in {family} family was found in the tree without a proper parent.".format(group=child, family=family_name))
                 nose.tools.assert_true(child in ascendParent.children, "Group {group} in {family} family was found in the tree without a proper parent.".format(group=nodeName, family=family_name))
+                nose.tools.assert_false(child is ascendParent, "Group {group} in {family} family is a parent to itself".format(group=nodeName, family=family_name))
 
     def kinetics_checkGroupsNonidentical(self, family_name):
         """
@@ -298,6 +300,14 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
             #top nodes and product nodes don't have parents by definition, so they get an automatic pass:
             if childNode in originalFamily.groups.top or childNode in originalFamily.forwardTemplate.products: continue
             parentNode = childNode.parent
+            
+            if parentNode is None:
+                # This is a mistake in the database, but it should be caught by kinetics_checkGroupsFoundInTree
+                # so rather than report it twice or crash, we'll just silently carry on to the next node.
+                continue
+            elif parentNode in originalFamily.forwardTemplate.products:
+                #This is a product node made by training reactions which we do not need to check
+                continue
             # Check whether the node has proper parents unless it is the top reactant or product node
             # The parent should be more general than the child
             nose.tools.assert_true(family.matchNodeToChild(parentNode, childNode),
@@ -305,17 +315,20 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
 
             #check that parentNodes which are LogicOr do not have an ancestor that is a Group
             #If it does, then the childNode must also be a child of the ancestor
-            if isinstance(parentNode, LogicOr):
-                ancestorNode = childNode
-                while ancestorNode not in originalFamily.groups.top and isinstance(ancestorNode, LogicOr):
+            if isinstance(parentNode.item, LogicOr):
+                ancestorNode = parentNode
+                while ancestorNode not in originalFamily.groups.top and isinstance(ancestorNode.item, LogicOr):
                     ancestorNode = ancestorNode.parent
-                if isinstance(ancestorNode, Group):
+                if isinstance(ancestorNode.item, Group):
                     nose.tools.assert_true(family.matchNodeToChild(ancestorNode, childNode),
                                     "In {family} family, group {ancestor} is not a proper ancestor of its child {child}.".format(family=family_name, ancestor=ancestorNode, child=nodeName))
 
     def kinetics_checkSiblingsForParents(self, family_name):
         """
         This test checks that siblings in a tree are not actually parent/child
+
+        See general_checkSiblingsForParents comments for more detailed description
+        of the test.
         """
         from rmgpy.data.base import Database
         originalFamily = self.database.kinetics.families[family_name]
@@ -328,12 +341,8 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
             if node in originalFamily.forwardTemplate.products: continue
             for index, child1 in enumerate(node.children):
                 for child2 in node.children[index+1:]:
-                    #Don't check a node against itself
-                    if child1 is child2: continue
                     nose.tools.assert_false(family.matchNodeToChild(child1, child2),
-                                            "In family {0}, node {1} is written as a sibling of {2}, when it is actually a parent.".format(family_name, child1, child2))
-                    nose.tools.assert_false(family.matchNodeToChild(child2, child1),
-                                            "In family {0}, node {1} is written as a sibling of {2}, when it is actually a parent.".format(family_name, child2, child1))
+                                            "In family {0}, node {1} is a parent of {2}, but they are written as siblings.".format(family_name, child1, child2))
 
     def kinetics_checkAdjlistsNonidentical(self, database):
         """
@@ -389,8 +398,6 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
         family = self.database.kinetics.families[family_name]
         targetLabel=['Cd', 'CO', 'CS', 'Cdd']
         targetAtomTypes=[atomTypes[x] for x in targetLabel]
-        oxygen=[atomTypes['O']] + atomTypes['O'].specific
-        sulfur=[atomTypes['S']] + atomTypes['S'].specific
 
         #ignore product entries that get created from training reactions
         ignore=[]
@@ -421,15 +428,15 @@ class TestDatabase():  # cannot inherit from unittest.TestCase if we want to use
                             #Ignore ligands that are not double bonded
                             if 'D' in bond.order:
                                 for ligAtomType in ligand.atomType:
-                                    if ligand.atomType[0] in oxygen: correctAtomList.append('CO')
-                                    elif ligand.atomType[0] in sulfur: correctAtomList.append('CS')
+                                    if ligand.atomType[0].isSpecificCaseOf(atomTypes['O']): correctAtomList.append('CO')
+                                    elif ligand.atomType[0].isSpecificCaseOf(atomTypes['S']): correctAtomList.append('CS')
 
                     #remove duplicates from correctAtom:
                     correctAtomList=list(set(correctAtomList))
                     for correctAtom in correctAtomList:
                         nose.tools.assert_true(atomTypes[correctAtom] in atom.atomType,
                                                """In family {0}, node {1} is missing the atomtype {2} in atom {3} and may be misusing the atomtype Cd, CO, CS, or Cdd.
-The following adjList may be have atoms in a different ordering than the input file:
+The following adjList may have atoms in a different ordering than the input file:
 {4}
                                             """.format(family_name, entry, correctAtom, index+1, entry.item.toAdjacencyList()))
 
@@ -446,6 +453,7 @@ The following adjList may be have atoms in a different ordering than the input f
                 ascendParent = ascendParent.parent
                 nose.tools.assert_true(ascendParent is not None, "Node {node} in {group} group was found in the tree without a proper parent.".format(node=child, group=group_name))
                 nose.tools.assert_true(child in ascendParent.children, "Node {node} in {group} group was found in the tree without a proper parent.".format(node=nodeName, group=group_name))
+                nose.tools.assert_false(child is ascendParent, "Node {node} in {group} is a parent to itself".format(node=nodeName, group=group_name))
     
     def general_checkGroupsNonidentical(self, group_name, group):
         """
@@ -478,27 +486,37 @@ The following adjList may be have atoms in a different ordering than the input f
 
             #check that parentNodes which are LogicOr do not have an ancestor that is a Group
             #If it does, then the childNode must also be a child of the ancestor
-            if isinstance(parentNode, LogicOr):
-                ancestorNode = childNode
-                while ancestorNode not in group.top and isinstance(ancestorNode, LogicOr):
+            if isinstance(parentNode.item, LogicOr):
+                ancestorNode = parentNode
+                while ancestorNode not in group.top and isinstance(ancestorNode.item, LogicOr):
                     ancestorNode = ancestorNode.parent
-                if isinstance(ancestorNode, Group):
+                if isinstance(ancestorNode.item, Group):
                     nose.tools.assert_true(group.matchNodeToChild(ancestorNode, childNode),
                                     "In {group} group, node {ancestor} is not a proper ancestor of its child {child}.".format(group=group_name, ancestor=ancestorNode, child=nodeName))
 
     def general_checkSiblingsForParents(self, group_name, group):
         """
-        This test checks that siblings in a tree are not actually parent/child
+        This test checks that siblings in a tree are not actually parent/child.
+
+        For example in a tree:
+
+        L1. A
+            L2. B
+            L2. C
+
+        This tests that C is not a child of B, which would make C inaccessible because
+        we always match B first.
+
+        We do not check that B is not a child of C becausethat does not cause accessibility
+        problems and may actually be necessary in some trees. For example, in the polycyclic
+        thermo groups B might be a tricyclic and C a bicyclic parent. Currently there is no
+        way to writes a bicyclic group that excludes an analogous tricyclic.
         """
         for nodeName, node in group.entries.iteritems():
             for index, child1 in enumerate(node.children):
                 for child2 in node.children[index+1:]:
-                    #Don't check a node against itself
-                    if child1 is child2: continue
                     nose.tools.assert_false(group.matchNodeToChild(child1, child2),
-                                            "In {0} group, node {1} is written as a sibling of {2}, when it is actually a parent.".format(group_name, child1, child2))
-                    nose.tools.assert_false(group.matchNodeToChild(child2, child1),
-                                            "In {0} group, node {1} is written as a sibling of {2}, when it is actually a parent.".format(group_name, child2, child1))
+                                            "In {0} group, node {1} is a parent of {2}, but they are written as siblings.".format(group_name, child1, child2))
 
     def general_checkCdAtomType(self, group_name, group):
         """
@@ -507,8 +525,6 @@ The following adjList may be have atoms in a different ordering than the input f
         """
         targetLabel=['Cd', 'CO', 'CS', 'Cdd']
         targetAtomTypes=[atomTypes[x] for x in targetLabel]
-        oxygen=[atomTypes['O']] + atomTypes['O'].specific
-        sulfur=[atomTypes['S']] + atomTypes['S'].specific
 
         for entryName, entry in group.entries.iteritems():
             if isinstance(entry.item, Group):
@@ -528,15 +544,15 @@ The following adjList may be have atoms in a different ordering than the input f
                             #Ignore ligands that are not double bonded
                             if 'D' in bond.order:
                                 for ligAtomType in ligand.atomType:
-                                    if ligand.atomType[0] in oxygen: correctAtomList.append('CO')
-                                    elif ligand.atomType[0] in sulfur: correctAtomList.append('CS')
+                                    if ligand.atomType[0].isSpecificCaseOf(atomTypes['O']): correctAtomList.append('CO')
+                                    elif ligand.atomType[0].isSpecificCaseOf(atomTypes['S']): correctAtomList.append('CS')
 
                     #remove duplicates from correctAtom:
                     correctAtomList=list(set(correctAtomList))
                     for correctAtom in correctAtomList:
                         nose.tools.assert_true(atomTypes[correctAtom] in atom.atomType,
                                                 """In group {0}, node {1} is missing the atomtype {2} in atom {3} and may be misusing the atomtype Cd, CO, CS, or Cdd.
-The following adjList may be have atoms in a different ordering than the input file:
+The following adjList may have atoms in a different ordering than the input file:
 {4}
                                             """.format(group_name, entry, correctAtom, index+1, entry.item.toAdjacencyList()))
 
